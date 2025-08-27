@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>The Camy Games</title>
+  <style>
+    body {
+      display:flex; justify-content:center; align-items:center;
+      height:100vh; margin:0;
+      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+      font-family: Arial, sans-serif;
+    }
+    .container{
+      text-align:center; background:#fff; padding:40px; width:420px;
+      border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,.25);
+    }
+    h1{ font-size:3em; margin:0 0 10px; color:#333; }
+    p{ margin:6px 0 20px; }
+    ul{ list-style:none; padding:0; margin:0; }
+    li{ margin:12px 0; }
+    a.game-link{
+      display:inline-block; text-decoration:none; font-size:1.3em;
+      background:#4CAF50; color:#fff; padding:12px 18px; border-radius:10px;
+      transition:background .25s;
+    }
+    a.game-link:hover{ background:#45a049; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>The Camy Games</h1>
+    <p>Welcome! Pick a game to play:</p>
+    <ul>
+      <li><a class="game-link" href="guess-the-number.html">🎲 Guess the Number</a></li>
+      <li><a class="game-link" href="pong.html">🏓 Camy Pong</a></li>
+    </ul>
+  </div>
+</body>
+</html>

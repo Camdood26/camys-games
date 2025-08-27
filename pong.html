@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Camy Pong</title>
+  <style>
+    html, body { height:100%; margin:0; }
+    body { display:flex; justify-content:center; align-items:center; background:#ffffff; font-family:Arial, sans-serif; }
+    #wrap { position:relative; width:800px; }
+    canvas { display:block; background:transparent; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.2); }
+
+    /* Top overlays */
+    .title {
+      position:absolute; left:0; right:0; top:-44px;
+      text-align:center; font-weight:900; font-size:1.8rem; letter-spacing:.5px; user-select:none;
+      text-shadow:0 2px 6px rgba(0,0,0,.2);
+    }
+    .hud {
+      position:absolute; left:12px; top:10px; font-weight:bold; user-select:none;
+      background:rgba(255,255,255,.6); padding:6px 10px; border-radius:8px;
+    }
+    .diff {
+      position:absolute; right:12px; top:10px; user-select:none;
+      background:rgba(255,255,255,.6); padding:6px 10px; border-radius:8px;
+      display:flex; align-items:center; gap:10px; font-weight:bold;
+    }
+    .bar {
+      width:180px; height:12px; border-radius:8px; background:rgba(0,0,0,.15); overflow:hidden;
+    }
+    .fill {
+      height:100%; width:0%; background:#3b82f6; transition:width .12s linear, background-color .3s linear;
+    }
+
+    .centerText {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      text-align:center; padding:20px; font-size:1.1rem; font-weight:bold; user-select:none;
+    }
+    .btn {
+      display:inline-block; margin-top:10px; padding:10px 14px; border-radius:10px;
+      background:#4CAF50; color:#fff; text-decoration:none;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div class="title">Camy Pong</div>
+    <canvas id="game" width="800" height="500"></canvas>
+
+    <div class="hud" id="hud">Score: 0 | High: 0</div>
+
+    <div class="diff" id="diffBox">
+      <span>Difficulty</span>
+      <div class="bar"><div class="fill" id="diffFill"></div></div>
+      <span id="diffPct">0%</span>
+    </div>
+
+    <div class="centerText" id="overlay">
+      Press <span style="padding:0 6px; border:1px solid #333; border-radius:6px; margin:0 4px;">S</span> to start.
+      Use ◀ ▶ or mouse to move.
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const hud = document.getElementById('hud');
+    const overlay = document.getElementById('overlay');
+    const diffFill = document.getElementById('diffFill');
+    const diffPct = document.getElementById('diffPct');
+
+    // ---------- SOUND ----------
+    let audioCtx = null;
+    function getCtx() { if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+    function tone({freq=440,type='sine',dur=0.12,gain=0.15,startFreq=null}) {
+      const ac=getCtx(),t0=ac.currentTime; const osc=ac.createOscillator(); const g=ac.createGain();
+      osc.type=type; osc.frequency.value=startFreq??freq;
+      g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(gain,t0+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+      if(startFreq&&startFreq!==freq){ osc.frequency.setValueAtTime(startFreq,t0); osc.frequency.exponentialRampToValueAtTime(freq,t0+dur);}
+      osc.connect(g).connect(ac.destination); osc.start(t0); osc.stop(t0+dur);
+    }
+    function playBoing(){ tone({type:'sine',startFreq:280,freq:520,dur:0.12,gain:0.18}); }
+    function playWallBoing(){ tone({type:'sine',startFreq:220,freq:380,dur:0.09,gain:0.14}); }
+    function playBuzz(){ const ac=getCtx(),t0=ac.currentTime; const osc=ac.createOscillator(); const g=ac.createGain();
+      osc.type='square'; osc.frequency.setValueAtTime(240,t0); osc.frequency.exponentialRampToValueAtTime(80,t0+0.35);
+      g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.2,t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.4);
+      osc.connect(g).connect(ac.destination); osc.start(t0); osc.stop(t0+0.42); }
+    async function playFanfare(){ const notes=[261.63,329.63,392.00,523.25];
+      for(let n of notes){ tone({type:'triangle',freq:n,dur:0.12,gain:0.18}); await new Promise(r=>setTimeout(r,120)); }
+      tone({type:'triangle',freq:659.25,dur:0.18,gain:0.2}); }
+
+    // ---------- GAME STATE ----------
+    const HS_KEY='camy_pong_highscore';
+    let highScore=Number(sessionStorage.getItem(HS_KEY)||0);
+    let running=false,gameOver=false;
+    const paddle={w:120,h:16,x:canvas.width/2-60,y:canvas.height-30,speed:7,moveLeft:false,moveRight:false};
+    const ball={x:canvas.width/2,y:canvas.height/2,r:9,vx:3,vy:-3};
+    let score=0,hitsSinceBoost=0,fanfarePlayedThisScore=false;
+
+    // ---------- INPUT ----------
+    document.addEventListener('keydown',(e)=>{ if(e.key==='ArrowLeft')paddle.moveLeft=true; if(e.key==='ArrowRight')paddle.moveRight=true;
+      if((e.key==='s'||e.key==='S')&&(!running||gameOver))startGame(); });
+    document.addEventListener('keyup',(e)=>{ if(e.key==='ArrowLeft')paddle.moveLeft=false; if(e.key==='ArrowRight')paddle.moveRight=false; });
+    canvas.addEventListener('mousemove',(e)=>{ const rect=canvas.getBoundingClientRect(); const mx=e.clientX-rect.left;
+      paddle.x=Math.min(canvas.width-paddle.w,Math.max(0,mx-paddle.w/2)); });
+
+    // ---------- GAME FLOW ----------
+    function startGame(){
+      getCtx(); running=true; gameOver=false; score=0; hitsSinceBoost=0; fanfarePlayedThisScore=false;
+      const speed=3,angle=(Math.random()*0.6+0.2)*(Math.random()<0.5?1:-1);
+      ball.x=canvas.width/2; ball.y=canvas.height/2; ball.vx=speed*angle*2; ball.vy=-speed*2;
+      overlay.style.display='none'; loop();
+    }
+    function loop(){ if(!running)return; update(); draw(); requestAnimationFrame(loop); }
+
+    function update(){
+      if(paddle.moveLeft)paddle.x-=paddle.speed; if(paddle.moveRight)paddle.x+=paddle.speed;
+      paddle.x=Math.max(0,Math.min(canvas.width-paddle.w,paddle.x));
+      ball.x+=ball.vx; ball.y+=ball.vy;
+
+      if(ball.x-ball.r<=0&&ball.vx<0){ ball.x=ball.r; ball.vx*=-1; playWallBoing();}
+      if(ball.x+ball.r>=canvas.width&&ball.vx>0){ ball.x=canvas.width-ball.r; ball.vx*=-1; playWallBoing();}
+      if(ball.y-ball.r<=0&&ball.vy<0){ ball.y=ball.r; ball.vy*=-1; playWallBoing();}
+
+      if(ball.y+ball.r>=paddle.y&&ball.y+ball.r<=paddle.y+paddle.h&&ball.x>=paddle.x&&ball.x<=paddle.x+paddle.w&&ball.vy>0){
+        ball.y=paddle.y-ball.r; ball.vy*=-1; const hitPos=((ball.x-paddle.x)/paddle.w)-0.5; ball.vx+=hitPos*2;
+        score++; hitsSinceBoost++; playBoing(); if(hitsSinceBoost>=5){ hitsSinceBoost=0; ball.vx*=1.05; ball.vy*=1.05; }
+      }
+
+      if(ball.y-ball.r>canvas.height)endGame();
+
+      setBackgroundTint(score); hud.textContent=`Score: ${score} | High: ${highScore}`;
+
+      // Difficulty bar: score/5, cap 100%, colour change
+      const pct=Math.min(100,Math.floor(score/5));
+      diffFill.style.width=pct+'%';
+      if(pct<=30){ diffFill.style.background='#4CAF50'; }  // green
+      else if(pct<=70){ diffFill.style.background='#f59e0b'; } // orange
+      else { diffFill.style.background='#ef4444'; } // red
+      diffPct.textContent=pct+'%';
+
+      if(!fanfarePlayedThisScore&&score>highScore){ fanfarePlayedThisScore=true; playFanfare(); }
+    }
+
+    function setBackgroundTint(score){
+      const steps=Math.floor(score/5); const factor=Math.max(0,1-0.01*steps);
+      const gb=Math.round(255*factor); document.body.style.backgroundColor=`rgb(255,${gb},${gb})`;
+    }
+    function draw(){
+      const bodyBg=window.getComputedStyle(document.body).backgroundColor;
+      const gb=Number(bodyBg.match(/\d+/g)[1]); const useDark=gb>128; const fg=useDark?'#000':'#fff';
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle=fg; roundRect(ctx,paddle.x,paddle.y,paddle.w,paddle.h,8); ctx.fill();
+      ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fillStyle=fg; ctx.fill();
+    }
+    function endGame(){
+      running=false; gameOver=true; playBuzz();
+      if(score>highScore){ highScore=score; sessionStorage.setItem(HS_KEY,String(highScore)); }
+      overlay.innerHTML=`🎉 <div style="font-size:1.4rem; margin-top:6px;">Congratulations!</div>
+        <div style="margin-top:8px;">Final score: <b>${score}</b></div>
+        <div>High score (this session): <b>${highScore}</b></div>
+        <div style="margin-top:10px;">Press <span style="padding:0 6px; border:1px solid #333; border-radius:6px; margin:0 4px;">S</span> to play again.</div>
+        <div style="margin-top:14px;"><a class="btn" href="index.html">⬅ Back to The Camy Games</a></div>`;
+      overlay.style.display='flex';
+    }
+    function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2);
+      ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr);
+      ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
+    hud.textContent=`Score: 0 | High: ${highScore}`;
+  </script>
+</body>
+</html>

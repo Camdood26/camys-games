@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Guess the Number</title>
+  <style>
+    body{
+      display:flex; justify-content:center; align-items:center;
+      height:100vh; margin:0; background:#f0f0f0; font-family:Arial, sans-serif;
+    }
+    .game-container{
+      text-align:center; background:#fff; padding:40px; width:480px;
+      border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,.2);
+    }
+    h1{ font-size:2.4em; margin:0 0 10px; }
+    p{ font-size:1.1em; margin:8px 0; }
+    .controls{ margin-top:15px; }
+    input[type="number"]{ font-size:1.2em; padding:10px; width:200px; }
+    button{
+      font-size:1.1em; padding:10px 18px; margin:10px 6px;
+      cursor:pointer; border:none; border-radius:8px; color:#fff; background:#4CAF50;
+    }
+    button:hover{ background:#45a049; }
+    #result{ margin-top:16px; font-size:1.3em; font-weight:bold; min-height:1.3em; }
+    .link-btn{ background:#3b82f6; }
+    .link-btn:hover{ background:#2563eb; }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>Guess the Number!</h1>
+    <p>I'm thinking of a number between 1 and 100…</p>
+
+    <div class="controls">
+      <input type="number" id="guess" placeholder="Enter your guess" min="1" max="100" />
+      <button onclick="checkGuess()">Submit Guess</button>
+      <button onclick="resetGame()">Play Again</button>
+    </div>
+
+    <p id="result"></p>
+
+    <button class="link-btn" onclick="goHome()">⬅ Back to The Camy Games</button>
+  </div>
+
+  <script>
+    let secretNumber = Math.floor(Math.random() * 100) + 1;
+
+    function checkGuess() {
+      const input = document.getElementById('guess');
+      const result = document.getElementById('result');
+      const guess = Number(input.value);
+
+      if (!guess || guess < 1 || guess > 100) {
+        result.textContent = "Enter a number from 1 to 100.";
+        return;
+      }
+
+      if (guess === secretNumber) {
+        result.textContent = "🎉 Correct! You guessed the number!";
+      } else if (guess > secretNumber) {
+        result.textContent = "Too high! Try again.";
+      } else {
+        result.textContent = "Too low! Try again.";
+      }
+
+      input.focus();
+      input.select();
+    }
+
+    function resetGame() {
+      secretNumber = Math.floor(Math.random() * 100) + 1;
+      document.getElementById('guess').value = "";
+      document.getElementById('result').textContent = "";
+      document.getElementById('guess').focus();
+    }
+
+    function goHome() {
+      window.location.href = "index.html";
+    }
+  </script>
+</body>
+</html>
