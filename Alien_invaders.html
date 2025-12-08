@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>Alien Invaders</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <style>
     body {
         margin: 0;
@@ -16,45 +17,42 @@
     #ui {
         position: absolute;
         color: white;
-        left: 20px;
-        top: 20px;
-        font-family: Arial;
-        font-size: 20px;
+        left: 16px;
+        top: 12px;
+        font-family: Arial, sans-serif;
+        font-size: 18px;
         z-index: 5;
     }
 
-    /* ========================== */
-    /* MOBILE TOUCH CONTROLS     */
-    /* ========================== */
-
+    /* MOBILE TOUCH CONTROLS */
     #touch-controls {
         position: fixed;
-        bottom: 25px;
+        bottom: 18px;
         left: 50%;
         transform: translateX(-50%);
         display: flex;
-        gap: 30px;
+        gap: 22px;
         z-index: 20;
+        pointer-events: auto;
     }
 
     #touch-controls button {
-        width: 90px;
-        height: 90px;
-        font-size: 40px;
+        width: 82px;
+        height: 82px;
+        font-size: 36px;
         border: none;
-        border-radius: 20px;
-        background: rgba(255,255,255,0.22);
+        border-radius: 16px;
+        background: rgba(255,255,255,0.18);
         color: white;
         backdrop-filter: blur(6px);
         user-select: none;
         -webkit-user-select: none;
+        touch-action: none;
     }
 
-    /* Hide touch controls on desktop */
+    /* Hide touch controls on desktop pointer devices */
     @media (pointer:fine) {
-        #touch-controls {
-            display: none;
-        }
+        #touch-controls { display: none; }
     }
 </style>
 </head>
@@ -63,10 +61,10 @@
 <div id="ui">Score: 0<br>Level: 1</div>
 
 <!-- Touch buttons -->
-<div id="touch-controls">
-    <button id="btn-left">⟵</button>
-    <button id="btn-fire">🔥</button>
-    <button id="btn-right">⟶</button>
+<div id="touch-controls" aria-hidden="false">
+    <button id="btn-left" aria-label="Move left">⟵</button>
+    <button id="btn-fire" aria-label="Fire">🔥</button>
+    <button id="btn-right" aria-label="Move right">⟶</button>
 </div>
 
 <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -78,33 +76,41 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+// keyboard state
 let keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+window.addEventListener("keydown", e => { keys[e.key] = true; });
+window.addEventListener("keyup", e => { keys[e.key] = false; });
 
 // ===============================
-// TOUCH CONTROL STATES
+// TOUCH / POINTER CONTROL STATES
 // ===============================
 let touchLeft = false;
 let touchRight = false;
 let touchFire = false;
 
-// Button elements
 const btnLeft  = document.getElementById("btn-left");
 const btnRight = document.getElementById("btn-right");
 const btnFire  = document.getElementById("btn-fire");
 
-// Touch Button Events
-btnLeft.addEventListener("touchstart", () => touchLeft = true);
-btnLeft.addEventListener("touchend", () => touchLeft = false);
+// Support both pointer and touch events for broader device coverage
+function bindBtn(btn, onDown, onUp) {
+  // pointer events (preferred)
+  btn.addEventListener("pointerdown", (e) => { e.preventDefault(); onDown(); });
+  btn.addEventListener("pointerup",   (e) => { e.preventDefault(); onUp(); });
+  btn.addEventListener("pointercancel",(e) => { e.preventDefault(); onUp(); });
+  btn.addEventListener("pointerleave",(e) => { e.preventDefault(); onUp(); });
 
-btnRight.addEventListener("touchstart", () => touchRight = true);
-btnRight.addEventListener("touchend", () => touchRight = false);
+  // fallback touch events (some older browsers)
+  btn.addEventListener("touchstart", (e) => { e.preventDefault(); onDown(); }, {passive:false});
+  btn.addEventListener("touchend", (e) => { e.preventDefault(); onUp(); }, {passive:false});
+}
 
-btnFire.addEventListener("touchstart", () => {
-    touchFire = true;
-    setTimeout(() => touchFire = false, 120);
-});
+bindBtn(btnLeft,  ()=> touchLeft = true,  ()=> touchLeft = false);
+bindBtn(btnRight, ()=> touchRight = true, ()=> touchRight = false);
+bindBtn(btnFire,
+  ()=> { touchFire = true; setTimeout(()=> touchFire = false, 120); },
+  ()=> { touchFire = false; }
+);
 
 // ===============================
 // GAME VARIABLES
@@ -145,29 +151,25 @@ function drawPlayer() {
 function updatePlayer() {
     let speed = player.speed + permanentPowerups.speedBoost;
 
-    // === MOVEMENT (keyboard + touch)
+    // MOVEMENT - keyboard + touch
     let moving = 0;
-
-    if (keys["ArrowLeft"] || touchLeft) moving = -1;
-    if (keys["ArrowRight"] || touchRight) moving = 1;
+    if (keys["ArrowLeft"] || keys["a"] || touchLeft) moving = -1;
+    if (keys["ArrowRight"] || keys["d"] || touchRight) moving = 1;
 
     player.x += moving * speed;
     if (player.x < 0) player.x = 0;
     if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
 
-    // === SHOOTING (keyboard + touch)
+    // SHOOTING - keyboard + touch
     if (player.cooldown > 0) player.cooldown--;
-
-    if ((keys[" "] || touchFire) && player.cooldown === 0) {
+    if ((keys[" "] || keys["Spacebar"] || keys["Space"] || touchFire) && player.cooldown === 0) {
         bullets.push({
             x: player.x + player.width / 2 - (4 + permanentPowerups.bulletSizeBoost) / 2,
             y: player.y,
             size: 4 + permanentPowerups.bulletSizeBoost,
             speed: 8
         });
-
-        player.cooldown = 20 - permanentPowerups.fireRateBoost;
-        if (player.cooldown < 5) player.cooldown = 5;
+        player.cooldown = Math.max(5, 20 - permanentPowerups.fireRateBoost);
     }
 }
 
@@ -175,15 +177,16 @@ function updatePlayer() {
 // BULLETS
 // ===============================
 function updateBullets() {
-    bullets.forEach((b, i) => {
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
         b.y -= b.speed;
-        if (b.y < 0) bullets.splice(i, 1);
-    });
+        if (b.y + b.size < 0) bullets.splice(i, 1);
+    }
 }
 
 function drawBullets() {
     ctx.fillStyle = "yellow";
-    bullets.forEach(b => ctx.fillRect(b.x, b.y, b.size, b.size));
+    for (let b of bullets) ctx.fillRect(b.x, b.y, b.size, b.size);
 }
 
 // ===============================
@@ -200,18 +203,20 @@ function spawnAliens() {
 
     let rows = 3 + Math.floor(level / 2);
     let cols = 8;
-    let spacing = 60;
+    let spacingX = 60;
+    let spacingY = 52;
+    const marginLeft = Math.max(40, (canvas.width - (cols-1)*spacingX - cols*30)/2);
 
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             enemies.push({
-                x: 100 + c * spacing,
-                y: 50 + r * spacing,
+                x: marginLeft + c * spacingX,
+                y: 40 + r * spacingY,
                 width: 30,
                 height: 30,
-                speedX: 1 + level * 0.3,
+                speedX: 1 + level * 0.25,
                 movingRight: true,
-                shootChance: 0.002 + level * 0.001
+                shootChance: 0.002 + level * 0.0015
             });
         }
     }
@@ -221,62 +226,67 @@ function spawnAliens() {
 // ALIEN UPDATES
 // ===============================
 function updateAliens() {
-    enemies.forEach((e, i) => {
+    for (let ei = enemies.length - 1; ei >= 0; ei--) {
+        const e = enemies[ei];
         if (e.movingRight) e.x += e.speedX;
         else e.x -= e.speedX;
 
-        if (e.x < 0 || e.x > canvas.width - e.width) {
-            e.movingRight = !e.movingRight;
-            e.y += 20;
-        }
+        if (e.x < 0) { e.movingRight = true; e.y += 18; }
+        if (e.x > canvas.width - e.width) { e.movingRight = false; e.y += 18; }
 
         // enemy shooting
         if (Math.random() < e.shootChance) {
             alienBullets.push({
-                x: e.x + e.width / 2,
+                x: e.x + e.width / 2 - 3,
                 y: e.y + e.height,
-                speed: 4 + level * 0.3
+                speed: 4 + level * 0.3,
+                w: 6, h: 10
             });
         }
 
-        // collision with bullets
-        bullets.forEach((b, bi) => {
+        // collision with bullets (iterate backwards handled above)
+        for (let bi = bullets.length - 1; bi >= 0; bi--) {
+            const b = bullets[bi];
             if (b.x < e.x + e.width && b.x + b.size > e.x &&
                 b.y < e.y + e.height && b.y + b.size > e.y) {
 
-                enemies.splice(i, 1);
+                enemies.splice(ei, 1);
                 bullets.splice(bi, 1);
                 score += 10;
+                break;
             }
-        });
-    });
+        }
+    }
 }
 
 function drawAliens() {
     ctx.fillStyle = "lime";
-    enemies.forEach(e => ctx.fillRect(e.x, e.y, e.width, e.height));
+    for (let e of enemies) ctx.fillRect(e.x, e.y, e.width, e.height);
 }
 
 // ===============================
 // ALIEN BULLETS
 // ===============================
 function updateAlienBullets() {
-    alienBullets.forEach((b, i) => {
+    for (let i = alienBullets.length - 1; i >= 0; i--) {
+        const b = alienBullets[i];
         b.y += b.speed;
-        if (b.y > canvas.height) alienBullets.splice(i, 1);
+        if (b.y > canvas.height + 20) { alienBullets.splice(i, 1); continue; }
 
-        if (b.x > player.x && b.x < player.x + player.width &&
-            b.y > player.y && b.y < player.y + player.height) {
-
+        // player hit test
+        if (b.x + (b.w||6) > player.x && b.x < player.x + player.width &&
+            b.y + (b.h||10) > player.y && b.y < player.y + player.height) {
+            // simple game over flow
             alert("Game Over! Your score: " + score);
-            document.location.reload();
+            location.reload();
+            return;
         }
-    });
+    }
 }
 
 function drawAlienBullets() {
     ctx.fillStyle = "red";
-    alienBullets.forEach(b => ctx.fillRect(b.x, b.y, 4, 10));
+    for (let b of alienBullets) ctx.fillRect(b.x, b.y, b.w||6, b.h||10);
 }
 
 // ===============================
@@ -299,63 +309,63 @@ function updateBoss() {
     if (!boss) return;
 
     boss.x += boss.speed * boss.direction;
-    if (boss.x < 0 || boss.x + boss.width > canvas.width) {
-        boss.direction *= -1;
-    }
+    if (boss.x < 6) { boss.x = 6; boss.direction = 1; }
+    if (boss.x + boss.width > canvas.width - 6) { boss.x = canvas.width - boss.width - 6; boss.direction = -1; }
 
     if (boss.shootCooldown > 0) boss.shootCooldown--;
     else {
-        alienBullets.push({
-            x: boss.x + boss.width / 2,
-            y: boss.y + boss.height,
-            speed: 6 + level * 0.3
-        });
-        boss.shootCooldown = 40 - Math.min(25, level * 2);
+        // spawn pattern of boss bullets
+        for (let i=0;i<3;i++){
+            alienBullets.push({
+                x: boss.x + boss.width * (0.25 + i*0.25),
+                y: boss.y + boss.height,
+                speed: 5 + level * 0.3,
+                w: 10, h: 12
+            });
+        }
+        boss.shootCooldown = Math.max(18, 40 - Math.min(25, level * 2));
     }
 
-    bullets.forEach((b, i) => {
-        if (
-            b.x < boss.x + boss.width &&
-            b.x + b.size > boss.x &&
-            b.y < boss.y + boss.height &&
-            b.y + b.size > boss.y
-        ) {
-            bullets.splice(i, 1);
-            boss.hp -= 10;
+    // boss hit detection
+    for (let bi = bullets.length - 1; bi >= 0; bi--) {
+        const b = bullets[bi];
+        if (b.x < boss.x + boss.width && b.x + b.size > boss.x &&
+            b.y < boss.y + boss.height && b.y + b.size > boss.y) {
 
+            bullets.splice(bi, 1);
+            boss.hp -= 10;
             if (boss.hp <= 0) {
                 givePermanentPowerup();
                 score += 200;
                 boss = null;
                 nextLevel();
+                break;
             }
         }
-    });
+    }
 }
 
 function drawBoss() {
     if (!boss) return;
-
     // body
     ctx.fillStyle = "#999";
     ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
 
-    // legs
+    // legs (simple)
     ctx.strokeStyle = "#444";
     ctx.lineWidth = 6;
     for (let i = 0; i < 4; i++) {
         ctx.beginPath();
         ctx.moveTo(boss.x + 20 + i * 40, boss.y + boss.height);
-        ctx.lineTo(boss.x + 10 + i * 40, boss.y + boss.height + 40);
+        ctx.lineTo(boss.x + 6 + i * 40, boss.y + boss.height + 38);
         ctx.stroke();
     }
 
     // HP bar
     ctx.fillStyle = "red";
     ctx.fillRect(boss.x, boss.y - 10, boss.width, 8);
-
     ctx.fillStyle = "green";
-    let hpWidth = boss.hp / (100 + level * 40) * boss.width;
+    let hpWidth = Math.max(0, boss.hp / (100 + level * 40) * boss.width);
     ctx.fillRect(boss.x, boss.y - 10, hpWidth, 8);
 }
 
@@ -364,11 +374,9 @@ function drawBoss() {
 // ===============================
 function givePermanentPowerup() {
     let choice = Math.floor(Math.random() * 3);
-
     if (choice === 0) permanentPowerups.fireRateBoost += 5;
     if (choice === 1) permanentPowerups.speedBoost += 0.5;
     if (choice === 2) permanentPowerups.bulletSizeBoost += 2;
-
     alert("Boss defeated! You gained a permanent upgrade!");
 }
 
@@ -382,8 +390,8 @@ function nextLevel() {
 }
 
 function updateUI() {
-    document.getElementById("ui").innerHTML =
-        `Score: ${score}<br>Level: ${level}`;
+    const ui = document.getElementById("ui");
+    ui.innerHTML = `Score: ${score}<br>Level: ${level}`;
 }
 
 // ===============================
@@ -405,7 +413,7 @@ function gameLoop() {
         drawBoss();
     } else {
         updateAliens();
-        drawAliins();
+        drawAliens();
     }
 
     updateAlienBullets();
@@ -416,8 +424,11 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// initialize
 spawnAliens();
+updateUI();
 gameLoop();
+
 </script>
 
 </body>
