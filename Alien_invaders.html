@@ -1,13 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Alien Invaders — Touch Fixed</title>
+<title>Alien Invaders — Touch + Sci-Fi Game Over</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+
 <style>
-  html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,Arial}
-  #ui{position:absolute;left:12px;top:8px;font-size:18px;z-index:30}
-  canvas{display:block;margin:48px auto 0; background:#191919; border:0}
-  /* Touch controls */
+  html,body{
+    height:100%;
+    margin:0;
+    background:#000;
+    color:#fff;
+    font-family:system-ui,Arial;
+    overflow:hidden;
+  }
+
+  #ui{
+    position:absolute;
+    left:12px;
+    top:8px;
+    font-size:18px;
+    z-index:30;
+  }
+
+  canvas{
+    display:block;
+    margin:48px auto 0;
+    background:#191919;
+    border:0;
+  }
+
+  /* -------------------------------------- */
+  /* TOUCH CONTROLS                         */
+  /* -------------------------------------- */
   #touch-controls {
     position: fixed;
     bottom: 18px;
@@ -18,6 +42,7 @@
     z-index: 40;
     pointer-events: auto;
   }
+
   .tc-btn {
     width: 86px;
     height: 86px;
@@ -26,17 +51,25 @@
     border: none;
     background: rgba(255,255,255,0.14);
     color: #fff;
-    -webkit-user-select:none; user-select:none;
+    -webkit-user-select:none;
+    user-select:none;
     touch-action: none;
-    display:flex; align-items:center; justify-content:center;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     box-shadow: 0 6px 18px rgba(0,0,0,0.6);
   }
-  .tc-btn:active, .tc-btn.active { background: rgba(255,255,255,0.28); transform: translateY(2px); }
-  /* Hide touch controls on desktop */
-  @media (pointer:fine) {
-    #touch-controls { display: none; }
+
+  .tc-btn:active,
+  .tc-btn.active {
+    background: rgba(255,255,255,0.28);
+    transform: translateY(2px);
   }
-  /* Debug small indicator (only visible while interacting) */
+
+  @media (pointer:fine) {
+    #touch-controls { display:none; }
+  }
+
   #touch-debug {
     position: fixed;
     right: 12px;
@@ -49,214 +82,383 @@
     z-index:50;
     display:none;
   }
+
+  /* -------------------------------------- */
+  /* DARK SCI-FI GAME OVER SCREEN           */
+  /* -------------------------------------- */
+
+  #gameover-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;           /* shown on death */
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  #gameover-panel {
+    background: rgba(20,20,25,0.85);
+    border: 2px solid rgba(255,0,0,0.4);
+    box-shadow: 0 0 25px rgba(255,0,0,0.6);
+    padding: 28px 40px;
+    border-radius: 14px;
+    text-align: center;
+    width: 320px;
+    animation: popin 0.35s ease-out;
+  }
+
+  @keyframes popin {
+    from { transform: scale(0.6); opacity:0; }
+    to   { transform: scale(1);   opacity:1; }
+  }
+
+  #go-title {
+    font-size: 36px;
+    margin-bottom: 10px;
+    color: #ff3333;
+    text-shadow: 0 0 12px #ff0000;
+    font-weight: bold;
+  }
+
+  #go-score {
+    margin-bottom: 25px;
+    font-size: 20px;
+    color: #ddd;
+  }
+
+  .go-btn {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #222;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(255,0,0,0.3);
+    transition: 0.2s;
+  }
+
+  .go-btn:hover {
+    background:#333;
+    box-shadow: 0 0 12px rgba(255,0,0,0.6);
+  }
+
 </style>
 </head>
+
 <body>
 
 <div id="ui">Score: 0<br>Level: 1</div>
 
 <!-- Touch controls -->
-<div id="touch-controls" aria-hidden="false">
-  <button id="btn-left" class="tc-btn" aria-label="Left">⟵</button>
-  <button id="btn-fire" class="tc-btn" aria-label="Fire">🔥</button>
-  <button id="btn-right" class="tc-btn" aria-label="Right">⟶</button>
+<div id="touch-controls">
+  <button id="btn-left" class="tc-btn">⟵</button>
+  <button id="btn-fire" class="tc-btn">🔥</button>
+  <button id="btn-right" class="tc-btn">⟶</button>
 </div>
 
 <div id="touch-debug">L: off &nbsp; F: off &nbsp; R: off</div>
 
+<!-- GAME OVER OVERLAY -->
+<div id="gameover-overlay">
+  <div id="gameover-panel">
+      <div id="go-title">GAME OVER</div>
+      <div id="go-score">Score: 0</div>
+
+      <button class="go-btn" onclick="location.reload()">Play Again</button>
+      <button class="go-btn" onclick="window.location='index.html'">Back to Home</button>
+  </div>
+</div>
+
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <script>
+/* EVERYTHING BELOW HERE IS LOGIC — CONTINUES IN NEXT PART */
 /* --------------------------
-   Basic game (unchanged core)
+   Base game variables
    -------------------------- */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-let score = 0, level = 1, gameRunning = true;
-let bullets = [], alienBullets = [], enemies = [], boss = null;
-let permanentPowerups = { fireRateBoost:0, speedBoost:0, bulletSizeBoost:0 };
+let score = 0;
+let level = 1;
+let bullets = [];
+let alienBullets = [];
+let enemies = [];
+let boss = null;
+let gameRunning = true;
+
+let permanentPowerups = {
+  fireRateBoost: 0,
+  speedBoost: 0,
+  bulletSizeBoost: 0
+};
 
 const ui = document.getElementById('ui');
-function updateUI(){ ui.innerHTML = `Score: ${score}<br>Level: ${level}`; }
+function updateUI(){
+  ui.innerHTML = `Score: ${score}<br>Level: ${level}`;
+}
 
 /* --------------------------
    Player
    -------------------------- */
-let player = { x: canvas.width/2 - 20, y: canvas.height - 60, width: 40, height:40, speed:5, cooldown:0 };
+let player = {
+  x: canvas.width/2 - 20,
+  y: canvas.height - 60,
+  width: 40,
+  height: 40,
+  speed: 5,
+  cooldown: 0
+};
 
-function drawPlayer(){ ctx.fillStyle = 'cyan'; ctx.fillRect(player.x, player.y, player.width, player.height); }
+function drawPlayer(){
+  ctx.fillStyle = 'cyan';
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+}
 
 /* --------------------------
-   Input state
+   Keyboard input
    -------------------------- */
 let keys = {};
-window.addEventListener('keydown', e => { keys[e.key] = true; });
-window.addEventListener('keyup',   e => { keys[e.key] = false; });
-
-/* Touch state variables */
-let touchLeft = false, touchRight = false, touchFire = false;
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup",   e => keys[e.key] = false);
 
 /* --------------------------
-   Player update (uses keyboard + touch)
+   Touch input state
+   -------------------------- */
+let touchLeft = false;
+let touchRight = false;
+let touchFire = false;
+
+/* --------------------------
+   Player movement + shooting
    -------------------------- */
 function updatePlayer(){
-  const speed = player.speed + permanentPowerups.speedBoost;
+  const moveSpeed = player.speed + permanentPowerups.speedBoost;
   let move = 0;
-  if (keys['ArrowLeft'] || keys['a'] || touchLeft) move = -1;
-  if (keys['ArrowRight'] || keys['d'] || touchRight) move = 1;
-  player.x += move * speed;
+
+  if (keys["ArrowLeft"] || keys["a"] || touchLeft)  move = -1;
+  if (keys["ArrowRight"] || keys["d"] || touchRight) move = 1;
+
+  player.x += move * moveSpeed;
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
   if (player.cooldown > 0) player.cooldown--;
-  const wantShoot = keys[' '] || keys['Spacebar'] || keys['Space'] || touchFire;
-  if (wantShoot && player.cooldown === 0) {
+
+  const wantShoot =
+      keys[" "] || keys["Space"] || keys["Spacebar"] || touchFire;
+
+  if (wantShoot && player.cooldown === 0){
     bullets.push({
       x: player.x + player.width/2 - (4 + permanentPowerups.bulletSizeBoost)/2,
       y: player.y,
       size: 4 + permanentPowerups.bulletSizeBoost,
       speed: 8
     });
+
     player.cooldown = Math.max(5, 20 - permanentPowerups.fireRateBoost);
-    // if it was a touch fire, clear the transient flag so it won't continuously fire unless held
-    // (touchFire may be held by pointerdown, so don't clear here in that case)
   }
 }
 
 /* --------------------------
-   Bullets & aliens (same logic)
+   Player bullets
    -------------------------- */
 function updateBullets(){
   for (let i = bullets.length - 1; i >= 0; i--){
     bullets[i].y -= bullets[i].speed;
-    if (bullets[i].y + bullets[i].size < 0) bullets.splice(i,1);
+    if (bullets[i].y < -20) bullets.splice(i,1);
   }
 }
-function drawBullets(){ ctx.fillStyle='yellow'; for (let b of bullets) ctx.fillRect(b.x,b.y,b.size,b.size); }
 
-function spawnAliens(){
-  enemies = []; const rows = 3 + Math.floor(level/2); const cols=8;
-  const spacingX = 60, spacingY = 52;
-  const marginLeft = Math.max(40, (canvas.width - (cols-1)*spacingX - cols*30)/2);
-  for (let r=0;r<rows;r++){
-    for (let c=0;c<cols;c++){
-      enemies.push({
-        x: marginLeft + c*spacingX,
-        y: 40 + r*spacingY,
-        width:30,height:30,
-        speedX: 1 + level*0.25,
-        movingRight:true,
-        shootChance: 0.002 + level*0.0015
+function drawBullets(){
+  ctx.fillStyle = "yellow";
+  for (let b of bul
+/* --------------------------
+   Alien bullets + GAME OVER
+   -------------------------- */
+const gameOverOverlay = document.getElementById("gameover-overlay");
+const goScore = document.getElementById("go-score");
+
+function triggerGameOver(){
+  gameRunning = false;
+  goScore.textContent = "Score: " + score;
+  gameOverOverlay.style.display = "flex";
+}
+
+function updateAlienBullets(){
+  for (let i = alienBullets.length - 1; i >= 0; i--){
+    const b = alienBullets[i];
+    b.y += b.speed;
+
+    if (b.y > canvas.height + 20){
+      alienBullets.splice(i,1);
+      continue;
+    }
+
+    if (b.x + (b.w||6) > player.x &&
+        b.x < player.x + player.width &&
+        b.y + (b.h||10) > player.y &&
+        b.y < player.y + player.height){
+
+      triggerGameOver();
+      return;
+    }
+  }
+}
+
+function drawAlienBullets(){
+  ctx.fillStyle = "red";
+  for (let b of alienBullets){
+    ctx.fillRect(b.x, b.y, b.w||6, b.h||10);
+  }
+}
+
+/* --------------------------
+   Boss (robot spider style block)
+   -------------------------- */
+function spawnBoss(){
+  boss = {
+    x: canvas.width/2 - 100,
+    y: 80,
+    width: 200,
+    height: 120,
+    hp: 100 + level * 40,
+    speed: 2 + level * 0.2,
+    direction: 1,
+    shootCooldown: 0
+  };
+}
+
+function updateBoss(){
+  if (!boss) return;
+
+  boss.x += boss.speed * boss.direction;
+
+  if (boss.x < 6){ boss.x = 6; boss.direction = 1; }
+  if (boss.x + boss.width > canvas.width - 6){
+    boss.x = canvas.width - boss.width - 6;
+    boss.direction = -1;
+  }
+
+  if (boss.shootCooldown > 0) boss.shootCooldown--;
+  else {
+    for (let i = 0; i < 3; i++){
+      alienBullets.push({
+        x: boss.x + boss.width * (0.2 + 0.3*i),
+        y: boss.y + boss.height,
+        speed: 5 + level*0.3,
+        w: 10, h: 12
       });
     }
+
+    boss.shootCooldown = Math.max(18, 40 - Math.min(25, level*2));
   }
-}
 
-function updateAliens(){
-  for (let ei = enemies.length - 1; ei >= 0; ei--){
-    const e = enemies[ei];
-    e.x += e.movingRight ? e.speedX : -e.speedX;
-    if (e.x < 0){ e.movingRight = true; e.y += 18; }
-    if (e.x > canvas.width - e.width){ e.movingRight = false; e.y += 18; }
+  // bullet collision
+  for (let bi = bullets.length - 1; bi >= 0; bi--){
+    const b = bullets[bi];
+    if (b.x < boss.x + boss.width && b.x + b.size > boss.x &&
+        b.y < boss.y + boss.height && b.y + b.size > boss.y){
 
-    if (Math.random() < e.shootChance){
-      alienBullets.push({ x: e.x + e.width/2 - 3, y: e.y + e.height, speed: 4 + level*0.3, w:6,h:10 });
-    }
+      bullets.splice(bi,1);
+      boss.hp -= 10;
 
-    for (let bi = bullets.length - 1; bi >= 0; bi--){
-      const b = bullets[bi];
-      if (b.x < e.x + e.width && b.x + b.size > e.x && b.y < e.y + e.height && b.y + b.size > e.y){
-        enemies.splice(ei,1);
-        bullets.splice(bi,1);
-        score += 10;
+      if (boss.hp <= 0){
+        givePermanentPowerup();
+        score += 200;
         updateUI();
+        boss = null;
+        nextLevel();
         break;
       }
     }
   }
 }
-function drawAliens(){ ctx.fillStyle='lime'; for (let e of enemies) ctx.fillRect(e.x,e.y,e.width,e.height); }
 
-function updateAlienBullets(){
-  for (let i = alienBullets.length -1; i >= 0; i--){
-    const b = alienBullets[i];
-    b.y += b.speed;
-    if (b.y > canvas.height + 20){ alienBullets.splice(i,1); continue; }
-    if (b.x + (b.w||6) > player.x && b.x < player.x + player.width && b.y + (b.h||10) > player.y && b.y < player.y + player.height){
-      alert('Game Over! Your score: ' + score);
-      location.reload();
-      return;
-    }
-  }
-}
-function drawAlienBullets(){ ctx.fillStyle='red'; for (let b of alienBullets) ctx.fillRect(b.x,b.y,b.w||6,b.h||10); }
-
-/* --------------------------
-   Boss (kept small)
-   -------------------------- */
-function spawnBoss(){ boss = { x:canvas.width/2 - 100, y:80, width:200, height:120, hp:100 + level*40, speed:2 + level*0.2, direction:1, shootCooldown:0 }; }
-function updateBoss(){
-  if (!boss) return;
-  boss.x += boss.speed * boss.direction;
-  if (boss.x < 6){ boss.x = 6; boss.direction = 1; }
-  if (boss.x + boss.width > canvas.width - 6){ boss.x = canvas.width - boss.width - 6; boss.direction = -1; }
-  if (boss.shootCooldown > 0) boss.shootCooldown--;
-  else {
-    for (let i=0;i<3;i++){
-      alienBullets.push({ x: boss.x + boss.width*(0.2 + 0.3*i), y: boss.y + boss.height, speed: 5 + level*0.3, w:10,h:12 });
-    }
-    boss.shootCooldown = Math.max(18, 40 - Math.min(25, level*2));
-  }
-  for (let bi = bullets.length - 1; bi >= 0; bi--){
-    const b = bullets[bi];
-    if (b.x < boss.x + boss.width && b.x + b.size > boss.x && b.y < boss.y + boss.height && b.y + b.size > boss.y){
-      bullets.splice(bi,1);
-      boss.hp -= 10;
-      if (boss.hp <= 0){
-        givePermanentPowerup();
-        score += 200; updateUI();
-        boss = null; nextLevel(); break;
-      }
-    }
-  }
-}
 function drawBoss(){
   if (!boss) return;
-  ctx.fillStyle='#999'; ctx.fillRect(boss.x,boss.y,boss.width,boss.height);
-  ctx.strokeStyle='#444'; ctx.lineWidth = 6;
-  for (let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(boss.x + 20 + i*40, boss.y + boss.height); ctx.lineTo(boss.x + 6 + i*40, boss.y + boss.height + 38); ctx.stroke(); }
-  ctx.fillStyle='red'; ctx.fillRect(boss.x, boss.y - 10, boss.width, 8);
-  ctx.fillStyle='green'; let hpW = Math.max(0, boss.hp / (100 + level*40) * boss.width); ctx.fillRect(boss.x, boss.y - 10, hpW, 8);
+
+  ctx.fillStyle="#999";
+  ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+
+  // legs
+  ctx.strokeStyle="#444";
+  ctx.lineWidth = 6;
+  for (let i=0;i<4;i++){
+    ctx.beginPath();
+    ctx.moveTo(boss.x + 20 + i*40, boss.y + boss.height);
+    ctx.lineTo(boss.x + 6 + i*40, boss.y + boss.height + 38);
+    ctx.stroke();
+  }
+
+  // health bar
+  ctx.fillStyle='red';
+  ctx.fillRect(boss.x, boss.y - 10, boss.width, 8);
+
+  ctx.fillStyle='green';
+  let hpW = Math.max(0, boss.hp / (100 + level*40) * boss.width);
+  ctx.fillRect(boss.x, boss.y - 10, hpW, 8);
 }
 
 /* --------------------------
-   Powerups & level
+   Powerups + next level
    -------------------------- */
 function givePermanentPowerup(){
-  const choice = Math.floor(Math.random()*3);
-  if (choice===0) permanentPowerups.fireRateBoost += 5;
-  if (choice===1) permanentPowerups.speedBoost += 0.5;
-  if (choice===2) permanentPowerups.bulletSizeBoost += 2;
-  alert('Boss defeated! You gained a permanent upgrade!');
+  const r = Math.floor(Math.random()*3);
+
+  if (r === 0) permanentPowerups.fireRateBoost += 5;
+  if (r === 1) permanentPowerups.speedBoost += 0.5;
+  if (r === 2) permanentPowerups.bulletSizeBoost += 2;
+
+  alert("Boss defeated! Permanent upgrade gained!");
 }
-function nextLevel(){ level++; updateUI(); spawnAliens(); }
+
+function nextLevel(){
+  level++;
+  updateUI();
+
+  // Every 5th level = BOSS
+  if (level % 5 === 0) spawnBoss();
+  else spawnAliens();
+}
 
 /* --------------------------
-   Main loop
+   Main game loop
    -------------------------- */
 function gameLoop(){
   if (!gameRunning) return;
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  updatePlayer(); drawPlayer();
-  updateBullets(); drawBullets();
-  if (boss){ updateBoss(); drawBoss(); } else { updateAliens(); drawAliens(); }
-  updateAlienBullets(); drawAlienBullets();
+
+  updatePlayer();
+  drawPlayer();
+
+  updateBullets();
+  drawBullets();
+
+  if (boss){
+    updateBoss();
+    drawBoss();
+  } else {
+    updateAliens();
+    drawAliens();
+  }
+
+  updateAlienBullets();
+  drawAlienBullets();
+
   if (!boss && enemies.length === 0) nextLevel();
+
   requestAnimationFrame(gameLoop);
 }
 
 /* --------------------------
-   Touch / Button handling (robust)
+   Touch controls binding
    -------------------------- */
 const btnLeft = document.getElementById('btn-left');
 const btnRight = document.getElementById('btn-right');
@@ -264,56 +466,39 @@ const btnFire = document.getElementById('btn-fire');
 const debug = document.getElementById('touch-debug');
 
 function setActiveButton(btn, state){
-  if (state) btn.classList.add('active'); else btn.classList.remove('active');
-  debug.style.display = (touchLeft || touchRight || touchFire) ? 'block' : 'none';
-  debug.innerText = `L: ${touchLeft? 'on' : 'off'}   F: ${touchFire? 'on' : 'off'}   R: ${touchRight? 'on' : 'off'}`;
+  if (state) btn.classList.add('active');
+  else btn.classList.remove('active');
+
+  debug.style.display = (touchLeft || touchRight || touchFire)
+    ? 'block' : 'none';
+
+  debug.innerText =
+    `L: ${touchLeft?'on':'off'}   F: ${touchFire?'on':'off'}   R: ${touchRight?'on':'off'}`;
 }
 
-// Combined binding for wide compatibility
 function bindControl(btn, downFn, upFn) {
-  // pointer events
-  btn.addEventListener('pointerdown', e => { e.preventDefault(); downFn(); setActiveButton(btn,true); }, {passive:false});
-  btn.addEventListener('pointerup',   e => { e.preventDefault(); upFn(); setActiveButton(btn,false); }, {passive:false});
-  btn.addEventListener('pointercancel', e => { e.preventDefault(); upFn(); setActiveButton(btn,false); }, {passive:false});
-  btn.addEventListener('pointerleave',  e => { e.preventDefault(); upFn(); setActiveButton(btn,false); }, {passive:false});
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); downFn(); setActiveButton(btn,true); });
+  btn.addEventListener('pointerup',   e => { e.preventDefault(); upFn();   setActiveButton(btn,false); });
+  btn.addEventListener('pointerleave',e => { e.preventDefault(); upFn();   setActiveButton(btn,false); });
+  btn.addEventListener('pointercancel',e=>{ e.preventDefault(); upFn();   setActiveButton(btn,false); });
 
-  // touch fallback
-  btn.addEventListener('touchstart', e => { e.preventDefault(); downFn(); setActiveButton(btn,true); }, {passive:false});
-  btn.addEventListener('touchend',   e => { e.preventDefault(); upFn(); setActiveButton(btn,false); }, {passive:false});
+  btn.addEventListener('touchstart', e => { e.preventDefault(); downFn(); setActiveButton(btn,true); });
+  btn.addEventListener('touchend',   e => { e.preventDefault(); upFn();   setActiveButton(btn,false); });
 
-  // mouse fallback (desktop)
-  btn.addEventListener('mousedown', e => { e.preventDefault(); downFn(); setActiveButton(btn,true); });
-  btn.addEventListener('mouseup',   e => { e.preventDefault(); upFn(); setActiveButton(btn,false); });
-  btn.addEventListener('mouseleave', e => { e.preventDefault(); upFn(); setActiveButton(btn,false); });
-
-  // click (for accessibility)
-  btn.addEventListener('click', e => { e.preventDefault(); /* click toggles quick press */ });
+  btn.addEventListener('mousedown', e => { downFn(); setActiveButton(btn,true); });
+  btn.addEventListener('mouseup',   e => { upFn();   setActiveButton(btn,false); });
 }
 
-// left/right are holdable; fire supports both tap and hold
-bindControl(btnLeft,
-  () => { touchLeft = true; setActiveButton(btnLeft,true); },
-  () => { touchLeft = false; setActiveButton(btnLeft,false); }
-);
-bindControl(btnRight,
-  () => { touchRight = true; setActiveButton(btnRight,true); },
-  () => { touchRight = false; setActiveButton(btnRight,false); }
-);
-bindControl(btnFire,
-  () => { touchFire = true; setActiveButton(btnFire,true); },
-  () => { touchFire = false; setActiveButton(btnFire,false); }
-);
-
-// Also allow holding fire by keeping touchFire true; for taps the pointerup/touchend will clear it
-// For safety, prevent the browser from scrolling when interacting with controls
-document.body.addEventListener('touchmove', function(e){ /* nothing */ }, {passive:false});
+bindControl(btnLeft,  () => touchLeft=true,  () => touchLeft=false);
+bindControl(btnRight, () => touchRight=true, () => touchRight=false);
+bindControl(btnFire,  () => touchFire=true,  () => touchFire=false);
 
 /* --------------------------
-   Init
+   Init game
    -------------------------- */
 spawnAliens();
 updateUI();
-requestAnimationFrame(gameLoop);
+gameLoop();
 </script>
 
 </body>
