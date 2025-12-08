@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Alien Invaders</title>
+<style>
+    body {
+        margin: 0;
+        background: black;
+        overflow: hidden;
+    }
+    canvas {
+        display: block;
+        margin: auto;
+        background: #111;
+    }
+    #ui {
+        position: absolute;
+        color: white;
+        left: 20px;
+        top: 20px;
+        font-family: Arial;
+        font-size: 20px;
+        z-index: 5;
+    }
+</style>
+</head>
+<body>
+
+<div id="ui">Score: 0<br>Level: 1</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<script>
+// ===============================
+// GAME BASE SETUP
+// ===============================
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// ===============================
+// GAME VARIABLES
+// ===============================
+let score = 0;
+let level = 1;
+let isBossLevel = false;
+let gameRunning = true;
+
+let bullets = [];
+let alienBullets = [];
+let enemies = [];
+let boss = null;
+
+let permanentPowerups = {
+    fireRateBoost: 0,      // reduces shot cooldown
+    speedBoost: 0,         // increases movement speed
+    bulletSizeBoost: 0     // increases bullet size
+};
+
+// ===============================
+// PLAYER
+// ===============================
+let player = {
+    x: canvas.width / 2 - 20,
+    y: canvas.height - 60,
+    width: 40,
+    height: 40,
+    speed: 5,
+    cooldown: 0
+};
+
+function drawPlayer() {
+    ctx.fillStyle = "cyan";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+}
+
+function updatePlayer() {
+    let speed = player.speed + permanentPowerups.speedBoost;
+
+    if (keys["ArrowLeft"] && player.x > 0) player.x -= speed;
+    if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += speed;
+
+    // shooting
+    if (player.cooldown > 0) player.cooldown--;
+    if (keys[" "] && player.cooldown === 0) {
+        bullets.push({
+            x: player.x + player.width / 2 - (4 + permanentPowerups.bulletSizeBoost) / 2,
+            y: player.y,
+            size: 4 + permanentPowerups.bulletSizeBoost,
+            speed: 8
+        });
+        player.cooldown = 20 - permanentPowerups.fireRateBoost;
+        if (player.cooldown < 5) player.cooldown = 5;
+    }
+}
+
+// ===============================
+// BULLETS
+// ===============================
+function updateBullets() {
+    bullets.forEach((b, i) => {
+        b.y -= b.speed;
+        if (b.y < 0) bullets.splice(i, 1);
+    });
+}
+
+function drawBullets() {
+    ctx.fillStyle = "yellow";
+    bullets.forEach(b => {
+        ctx.fillRect(b.x, b.y, b.size, b.size);
+    });
+}
+
+// ===============================
+// ALIEN WAVE GENERATION
+// ===============================
+function spawnAliens() {
+    enemies = [];
+    isBossLevel = (level % 5 === 0);
+
+    if (isBossLevel) {
+        spawnBoss();
+        return;
+    }
+
+    let rows = 3 + Math.floor(level / 2);
+    let cols = 8;
+    let spacing = 60;
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            enemies.push({
+                x: 100 + c * spacing,
+                y: 50 + r * spacing,
+                width: 30,
+                height: 30,
+                speedX: 1 + level * 0.3,
+                movingRight: true,
+                shootChance: 0.002 + level * 0.001
+            });
+        }
+    }
+}
+
+// ===============================
+// ALIEN UPDATES
+// ===============================
+function updateAliens() {
+    enemies.forEach((e, i) => {
+        // horizontal movement
+        if (e.movingRight) e.x += e.speedX;
+        else e.x -= e.speedX;
+
+        // switch direction
+        if (e.x < 0 || e.x > canvas.width - e.width) {
+            e.movingRight = !e.movingRight;
+            e.y += 20;
+        }
+
+        // random shooting
+        if (Math.random() < e.shootChance) {
+            alienBullets.push({
+                x: e.x + e.width / 2,
+                y: e.y + e.height,
+                speed: 4 + level * 0.3
+            });
+        }
+
+        // bullet collision (player bullet)
+        bullets.forEach((b, bi) => {
+            if (b.x < e.x + e.width && b.x + b.size > e.x &&
+                b.y < e.y + e.height && b.y + b.size > e.y) {
+                enemies.splice(i, 1);
+                bullets.splice(bi, 1);
+                score += 10;
+            }
+        });
+    });
+}
+
+function drawAliens() {
+    ctx.fillStyle = "lime";
+    enemies.forEach(e => {
+        ctx.fillRect(e.x, e.y, e.width, e.height);
+    });
+}
+
+// ===============================
+// ALIEN BULLETS
+// ===============================
+function updateAlienBullets() {
+    alienBullets.forEach((b, i) => {
+        b.y += b.speed;
+        if (b.y > canvas.height) alienBullets.splice(i, 1);
+
+        // hit player
+        if (
+            b.x > player.x &&
+            b.x < player.x + player.width &&
+            b.y > player.y &&
+            b.y < player.y + player.height
+        ) {
+            alert("Game Over! Your score: " + score);
+            document.location.reload();
+        }
+    });
+}
+
+function drawAlienBullets() {
+    ctx.fillStyle = "red";
+    alienBullets.forEach(b => {
+        ctx.fillRect(b.x, b.y, 4, 10);
+    });
+}
+
+// ===============================
+// BOSS — ROBOT SPIDER
+// ===============================
+function spawnBoss() {
+    boss = {
+        x: canvas.width / 2 - 100,
+        y: 80,
+        width: 200,
+        height: 120,
+        hp: 100 + level * 40,
+        speed: 2 + level * 0.2,
+        direction: 1,
+        shootCooldown: 0
+    };
+}
+
+function updateBoss() {
+    if (!boss) return;
+
+    // move left-right
+    boss.x += boss.speed * boss.direction;
+    if (boss.x < 0 || boss.x + boss.width > canvas.width) {
+        boss.direction *= -1;
+    }
+
+    // shoot
+    if (boss.shootCooldown > 0) boss.shootCooldown--;
+    else {
+        alienBullets.push({
+            x: boss.x + boss.width / 2,
+            y: boss.y + boss.height,
+            speed: 6 + level * 0.3
+        });
+        boss.shootCooldown = 40 - Math.min(25, level * 2);
+    }
+
+    // bullet collision
+    bullets.forEach((b, i) => {
+        if (
+            b.x < boss.x + boss.width &&
+            b.x + b.size > boss.x &&
+            b.y < boss.y + boss.height &&
+            b.y + b.size > boss.y
+        ) {
+            bullets.splice(i, 1);
+            boss.hp -= 10;
+
+            if (boss.hp <= 0) {
+                givePermanentPowerup();
+                score += 200;
+                boss = null;
+                nextLevel();
+            }
+        }
+    });
+}
+
+function drawBoss() {
+    if (!boss) return;
+
+    // body
+    ctx.fillStyle = "#999";
+    ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+
+    // legs
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 6;
+    for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(boss.x + 20 + i * 40, boss.y + boss.height);
+        ctx.lineTo(boss.x + 10 + i * 40, boss.y + boss.height + 40);
+        ctx.stroke();
+    }
+
+    // HP bar
+    ctx.fillStyle = "red";
+    ctx.fillRect(boss.x, boss.y - 10, boss.width, 8);
+
+    ctx.fillStyle = "green";
+    ctx.fillRect(boss.x, boss.y - 10, boss.hp / (100 + level * 40) * boss.width, 8);
+}
+
+// ===============================
+// PERMANENT POWERUPS
+// ===============================
+function givePermanentPowerup() {
+    let choice = Math.floor(Math.random() * 3);
+
+    if (choice === 0) permanentPowerups.fireRateBoost += 5;
+    if (choice === 1) permanentPowerups.speedBoost += 0.5;
+    if (choice === 2) permanentPowerups.bulletSizeBoost += 2;
+
+    alert("Boss defeated! You gained a permanent upgrade!");
+}
+
+// ===============================
+// LEVEL MANAGEMENT
+// ===============================
+function nextLevel() {
+    level++;
+    updateUI();
+    spawnAliens();
+}
+
+function updateUI() {
+    document.getElementById("ui").innerHTML =
+        `Score: ${score}<br>Level: ${level}`;
+}
+
+// ===============================
+// MAIN LOOP
+// ===============================
+function gameLoop() {
+    if (!gameRunning) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    updatePlayer();
+    drawPlayer();
+
+    updateBullets();
+    drawBullets();
+
+    if (boss) {
+        updateBoss();
+        drawBoss();
+    } else {
+        updateAliens();
+        drawAliens();
+    }
+
+    updateAlienBullets();
+    drawAlienBullets();
+
+    // next wave if all aliens dead
+    if (!boss && enemies.length === 0) nextLevel();
+
+    requestAnimationFrame(gameLoop);
+}
+
+spawnAliens();
+gameLoop();
+</script>
+
+</body>
+</html>
