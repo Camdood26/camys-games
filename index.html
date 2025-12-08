@@ -24,6 +24,13 @@
       transition:background .25s;
     }
     a.game-link:hover{ background:#45a049; }
+    /* Different color for Alien Invaders */
+    a.game-link--alt {
+      background: #1E90FF;
+    }
+    a.game-link--alt:hover {
+      background: #187bcd;
+    }
   </style>
 </head>
 <body>
@@ -31,12 +38,11 @@
     <h1>The Camy Games</h1>
     <p>Welcome! Pick a game to play:</p>
     <ul>
-      <li><a class="game-link" href="guess-the-number.html">🎲 Guess the Number</a></li>
-      <li><a class="game-link" href="pong.html">🏓 Camy Pong</a></li>
+      <li><a class="game-link" href="guess-the-number.html" target="_blank" rel="noopener noreferrer">🎲 Guess the Number</a></li>
+      <li><a class="game-link" href="pong.html" target="_blank" rel="noopener noreferrer">🏓 Camy Pong</a></li>
+      <!-- Alien Invaders opens in new tab -->
+      <li><a class="game-link game-link--alt" href="alien_invaders.html" target="_blank" rel="noopener noreferrer">🛸 Alien Invaders</a></li>
     </ul>
   </div>
 </body>
 </html>
-
-
-
