@@ -22,11 +22,53 @@
         font-size: 20px;
         z-index: 5;
     }
+
+    /* ========================== */
+    /* MOBILE TOUCH CONTROLS     */
+    /* ========================== */
+
+    #touch-controls {
+        position: fixed;
+        bottom: 25px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 30px;
+        z-index: 20;
+    }
+
+    #touch-controls button {
+        width: 90px;
+        height: 90px;
+        font-size: 40px;
+        border: none;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.22);
+        color: white;
+        backdrop-filter: blur(6px);
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    /* Hide touch controls on desktop */
+    @media (pointer:fine) {
+        #touch-controls {
+            display: none;
+        }
+    }
 </style>
 </head>
 <body>
 
 <div id="ui">Score: 0<br>Level: 1</div>
+
+<!-- Touch buttons -->
+<div id="touch-controls">
+    <button id="btn-left">⟵</button>
+    <button id="btn-fire">🔥</button>
+    <button id="btn-right">⟶</button>
+</div>
+
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <script>
@@ -39,6 +81,30 @@ const ctx = canvas.getContext("2d");
 let keys = {};
 document.addEventListener("keydown", e => keys[e.key] = true);
 document.addEventListener("keyup", e => keys[e.key] = false);
+
+// ===============================
+// TOUCH CONTROL STATES
+// ===============================
+let touchLeft = false;
+let touchRight = false;
+let touchFire = false;
+
+// Button elements
+const btnLeft  = document.getElementById("btn-left");
+const btnRight = document.getElementById("btn-right");
+const btnFire  = document.getElementById("btn-fire");
+
+// Touch Button Events
+btnLeft.addEventListener("touchstart", () => touchLeft = true);
+btnLeft.addEventListener("touchend", () => touchLeft = false);
+
+btnRight.addEventListener("touchstart", () => touchRight = true);
+btnRight.addEventListener("touchend", () => touchRight = false);
+
+btnFire.addEventListener("touchstart", () => {
+    touchFire = true;
+    setTimeout(() => touchFire = false, 120);
+});
 
 // ===============================
 // GAME VARIABLES
@@ -54,9 +120,9 @@ let enemies = [];
 let boss = null;
 
 let permanentPowerups = {
-    fireRateBoost: 0,      // reduces shot cooldown
-    speedBoost: 0,         // increases movement speed
-    bulletSizeBoost: 0     // increases bullet size
+    fireRateBoost: 0,
+    speedBoost: 0,
+    bulletSizeBoost: 0
 };
 
 // ===============================
@@ -79,18 +145,27 @@ function drawPlayer() {
 function updatePlayer() {
     let speed = player.speed + permanentPowerups.speedBoost;
 
-    if (keys["ArrowLeft"] && player.x > 0) player.x -= speed;
-    if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += speed;
+    // === MOVEMENT (keyboard + touch)
+    let moving = 0;
 
-    // shooting
+    if (keys["ArrowLeft"] || touchLeft) moving = -1;
+    if (keys["ArrowRight"] || touchRight) moving = 1;
+
+    player.x += moving * speed;
+    if (player.x < 0) player.x = 0;
+    if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+
+    // === SHOOTING (keyboard + touch)
     if (player.cooldown > 0) player.cooldown--;
-    if (keys[" "] && player.cooldown === 0) {
+
+    if ((keys[" "] || touchFire) && player.cooldown === 0) {
         bullets.push({
             x: player.x + player.width / 2 - (4 + permanentPowerups.bulletSizeBoost) / 2,
             y: player.y,
             size: 4 + permanentPowerups.bulletSizeBoost,
             speed: 8
         });
+
         player.cooldown = 20 - permanentPowerups.fireRateBoost;
         if (player.cooldown < 5) player.cooldown = 5;
     }
@@ -108,13 +183,11 @@ function updateBullets() {
 
 function drawBullets() {
     ctx.fillStyle = "yellow";
-    bullets.forEach(b => {
-        ctx.fillRect(b.x, b.y, b.size, b.size);
-    });
+    bullets.forEach(b => ctx.fillRect(b.x, b.y, b.size, b.size));
 }
 
 // ===============================
-// ALIEN WAVE GENERATION
+// ALIEN WAVES
 // ===============================
 function spawnAliens() {
     enemies = [];
@@ -149,17 +222,15 @@ function spawnAliens() {
 // ===============================
 function updateAliens() {
     enemies.forEach((e, i) => {
-        // horizontal movement
         if (e.movingRight) e.x += e.speedX;
         else e.x -= e.speedX;
 
-        // switch direction
         if (e.x < 0 || e.x > canvas.width - e.width) {
             e.movingRight = !e.movingRight;
             e.y += 20;
         }
 
-        // random shooting
+        // enemy shooting
         if (Math.random() < e.shootChance) {
             alienBullets.push({
                 x: e.x + e.width / 2,
@@ -168,10 +239,11 @@ function updateAliens() {
             });
         }
 
-        // bullet collision (player bullet)
+        // collision with bullets
         bullets.forEach((b, bi) => {
             if (b.x < e.x + e.width && b.x + b.size > e.x &&
                 b.y < e.y + e.height && b.y + b.size > e.y) {
+
                 enemies.splice(i, 1);
                 bullets.splice(bi, 1);
                 score += 10;
@@ -182,9 +254,7 @@ function updateAliens() {
 
 function drawAliens() {
     ctx.fillStyle = "lime";
-    enemies.forEach(e => {
-        ctx.fillRect(e.x, e.y, e.width, e.height);
-    });
+    enemies.forEach(e => ctx.fillRect(e.x, e.y, e.width, e.height));
 }
 
 // ===============================
@@ -195,13 +265,9 @@ function updateAlienBullets() {
         b.y += b.speed;
         if (b.y > canvas.height) alienBullets.splice(i, 1);
 
-        // hit player
-        if (
-            b.x > player.x &&
-            b.x < player.x + player.width &&
-            b.y > player.y &&
-            b.y < player.y + player.height
-        ) {
+        if (b.x > player.x && b.x < player.x + player.width &&
+            b.y > player.y && b.y < player.y + player.height) {
+
             alert("Game Over! Your score: " + score);
             document.location.reload();
         }
@@ -210,9 +276,7 @@ function updateAlienBullets() {
 
 function drawAlienBullets() {
     ctx.fillStyle = "red";
-    alienBullets.forEach(b => {
-        ctx.fillRect(b.x, b.y, 4, 10);
-    });
+    alienBullets.forEach(b => ctx.fillRect(b.x, b.y, 4, 10));
 }
 
 // ===============================
@@ -234,13 +298,11 @@ function spawnBoss() {
 function updateBoss() {
     if (!boss) return;
 
-    // move left-right
     boss.x += boss.speed * boss.direction;
     if (boss.x < 0 || boss.x + boss.width > canvas.width) {
         boss.direction *= -1;
     }
 
-    // shoot
     if (boss.shootCooldown > 0) boss.shootCooldown--;
     else {
         alienBullets.push({
@@ -251,7 +313,6 @@ function updateBoss() {
         boss.shootCooldown = 40 - Math.min(25, level * 2);
     }
 
-    // bullet collision
     bullets.forEach((b, i) => {
         if (
             b.x < boss.x + boss.width &&
@@ -294,7 +355,8 @@ function drawBoss() {
     ctx.fillRect(boss.x, boss.y - 10, boss.width, 8);
 
     ctx.fillStyle = "green";
-    ctx.fillRect(boss.x, boss.y - 10, boss.hp / (100 + level * 40) * boss.width, 8);
+    let hpWidth = boss.hp / (100 + level * 40) * boss.width;
+    ctx.fillRect(boss.x, boss.y - 10, hpWidth, 8);
 }
 
 // ===============================
@@ -343,13 +405,12 @@ function gameLoop() {
         drawBoss();
     } else {
         updateAliens();
-        drawAliens();
+        drawAliins();
     }
 
     updateAlienBullets();
     drawAlienBullets();
 
-    // next wave if all aliens dead
     if (!boss && enemies.length === 0) nextLevel();
 
     requestAnimationFrame(gameLoop);
