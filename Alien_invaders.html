@@ -220,7 +220,7 @@ function drawBullets(){
 /* Aliens (use sprites) */
 function spawnAliens(){
   enemies = [];
-  const rows = 3 + Math.floor(level/2);
+  const rows = Math.min(1 + Math.floor(level / 5), 4);
   const cols = 8;
   const spacingX = 60, spacingY = 52;
   const marginLeft = Math.max(40, (canvasEl.width - cols*30 - (cols-1)*spacingX)/2);
