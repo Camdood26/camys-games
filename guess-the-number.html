@@ -33,26 +33,8 @@
       margin:8px 0;
     }
 
-    .difficulty{
-      margin:15px 0;
-    }
-
-    button{
-      font-size:1.1em;
-      padding:10px 18px;
-      margin:6px;
-      cursor:pointer;
-      border:none;
-      border-radius:8px;
-      color:#fff;
-      background:#4CAF50;
-    }
-
-    button:hover{
-      background:#45a049;
-    }
-
     .difficulty button{
+      margin:6px;
       background:#6366f1;
     }
 
@@ -68,11 +50,32 @@
       background:#b91c1c;
     }
 
+    .controls{
+      margin-top:15px;
+    }
+
     input[type="number"]{
       font-size:1.2em;
       padding:10px;
       width:200px;
-      margin-top:10px;
+    }
+
+    button{
+      font-size:1.1em;
+      padding:10px 18px;
+      margin:10px 6px;
+      cursor:pointer;
+      border:none;
+      border-radius:8px;
+      color:#fff;
+    }
+
+    button:not(.extreme){
+      background:#4CAF50;
+    }
+
+    button:not(.extreme):hover{
+      background:#45a049;
     }
 
     #result{
@@ -83,23 +86,21 @@
     }
 
     #guesses{
+      margin-top:6px;
       font-size:1em;
       color:#555;
-      margin-top:6px;
     }
 
     .link-btn{
-      background:#3b82f6;
-      margin-top:15px;
+      background:#3b82f6 !important;
     }
 
     .link-btn:hover{
-      background:#2563eb;
+      background:#2563eb !important;
     }
   </style>
 </head>
 <body>
-
   <div class="game-container">
     <h1>Guess the Number!</h1>
     <p id="rangeText">I'm thinking of a number between 1 and 100…</p>
@@ -112,9 +113,9 @@
       <button class="extreme" onclick="setDifficulty(10000)">EXTRA HARD</button>
     </div>
 
-    <input type="number" id="guess" placeholder="Enter your guess" />
-
-    <div>
+    <div class="controls">
+      <input type="number" id="guess" placeholder="Enter your guess" />
+      <br>
       <button onclick="checkGuess()">Submit Guess</button>
       <button onclick="resetGame()">Play Again</button>
     </div>
@@ -143,13 +144,13 @@
     }
 
     function checkGuess(){
-      if(gameWon) return;
+      if (gameWon) return;
 
       const input = document.getElementById("guess");
       const result = document.getElementById("result");
       const guess = Number(input.value);
 
-      if(!guess || guess < 1 || guess > maxNumber){
+      if (!guess || guess < 1 || guess > maxNumber){
         result.textContent = `Enter a number from 1 to ${maxNumber}.`;
         return;
       }
@@ -158,12 +159,12 @@
       document.getElementById("guesses").textContent =
         `Guesses: ${guessCount}`;
 
-      if(guess === secretNumber){
+      if (guess === secretNumber){
         result.textContent =
-          `🎉 You win! It took you ${guessCount} guesses.`;
+          `🎉 You win! It took ${guessCount} guesses.`;
         gameWon = true;
         input.disabled = true;
-      } else if(guess > secretNumber){
+      } else if (guess > secretNumber){
         result.textContent = "Too high! 📉";
       } else {
         result.textContent = "Too low! 📈";
@@ -187,6 +188,5 @@
       window.location.href = "index.html";
     }
   </script>
-
 </body>
 </html>
