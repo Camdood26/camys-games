@@ -98,6 +98,18 @@
     .link-btn:hover{
       background:#2563eb !important;
     }
+
+    #youSuck{
+      display:none;
+      margin-left:24px;
+      font-size:3em;
+      font-weight:bold;
+      color:red;
+    }
+
+    #youSuck.show{
+      display:block;
+    }
   </style>
 </head>
 <body>
@@ -126,7 +138,10 @@
     <button class="link-btn" onclick="goHome()">⬅ Back to The Camy Games</button>
   </div>
 
+  <div id="youSuck">You Suck</div>
+
   <script>
+    const MAX_GUESSES = 30;
     let maxNumber = 100;
     let secretNumber = randomNumber();
     let guessCount = 0;
@@ -170,6 +185,10 @@
         result.textContent = "Too low! 📈";
       }
 
+      if (guessCount >= MAX_GUESSES && !gameWon){
+        document.getElementById("youSuck").classList.add("show");
+      }
+
       input.select();
     }
 
@@ -181,6 +200,7 @@
       document.getElementById("guess").disabled = false;
       document.getElementById("result").textContent = "";
       document.getElementById("guesses").textContent = "Guesses: 0";
+      document.getElementById("youSuck").classList.remove("show");
       document.getElementById("guess").focus();
     }
 
