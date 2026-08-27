@@ -55,6 +55,10 @@ canvas{display:block;margin:48px auto 0;background:#111}
 <div id="gameOverScreen">
   <div id="gameOverBox">
     <h2 style="color:red;margin-top:0">Game Over</h2>
+    <button onclick="restartGame()"
+      style="padding:10px 18px;font-size:16px;background:#4CAF50;color:white;border:1px solid #555;border-radius:8px;margin-right:8px">
+      🔄 Restart
+    </button>
     <button onclick="closeGameTab()"
       style="padding:10px 18px;font-size:16px;background:#222;color:white;border:1px solid #555;border-radius:8px">
       Back to Home
@@ -275,6 +279,18 @@ function drawBoss(){
 function gameOver(){
   running=false;
   document.getElementById("gameOverScreen").style.display="flex";
+}
+
+/* Restart: reset all state back to a fresh game and start the loop again */
+function restartGame(){
+  score=0; level=1; lives=3; invincible=0;
+  bullets=[]; alienBullets=[]; boss=null;
+  player.x=380; player.y=520; player.cool=0;
+  document.getElementById("gameOverScreen").style.display="none";
+  updateUI();
+  spawnAliens();
+  running=true;
+  loop();
 }
 
 /* Loop */
