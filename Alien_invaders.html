@@ -44,7 +44,7 @@ canvas{display:block;margin:48px auto 0;background:#111}
 </head>
 <body>
 
-<div id="ui">Score: 0<br>Level: 1</div>
+<div id="ui">Score: 0<br>Level: 1<br>Lives: 3</div>
 
 <div id="touch-controls">
   <button class="tc-btn" id="btnLeft">⟵</button>
@@ -55,7 +55,7 @@ canvas{display:block;margin:48px auto 0;background:#111}
 <div id="gameOverScreen">
   <div id="gameOverBox">
     <h2 style="color:red;margin-top:0">Game Over</h2>
-    <button onclick="location.href='index.html'"
+    <button onclick="closeGameTab()"
       style="padding:10px 18px;font-size:16px;background:#222;color:white;border:1px solid #555;border-radius:8px">
       Back to Home
     </button>
@@ -73,11 +73,20 @@ let score=0,level=1;
 let bullets=[],alienBullets=[],enemies=[],boss=null;
 let keys={},touchLeft=false,touchRight=false,touchFire=false;
 let running=true;
+let lives=3,invincible=0;
 
 window.onkeydown=e=>keys[e.key]=true;
 window.onkeyup=e=>keys[e.key]=false;
 
-function updateUI(){ui.innerHTML=`Score: ${score}<br>Level: ${level}`}
+function updateUI(){ui.innerHTML=`Score: ${score}<br>Level: ${level}<br>Lives: ${lives}`}
+
+/* Close the tab so it doesn't clutter the browser; if the browser
+   won't allow scripts to close a tab it didn't open itself,
+   fall back to going back to the games home page. */
+function closeGameTab(){
+  window.close();
+  setTimeout(()=>{ location.href='index.html'; }, 150);
+}
 
 /* Player */
 const player={x:380,y:520,w:40,h:40,speed:5,cool:0};
@@ -92,6 +101,7 @@ function updatePlayer(){
   }
 }
 function drawPlayer(){
+  if(invincible>0&&Math.floor(invincible/4)%2===0)return; // flash while invincible
   ctx.fillStyle="cyan";
   ctx.fillRect(player.x,player.y,player.w,player.h);
 }
@@ -185,11 +195,30 @@ function drawAliens(){enemies.forEach(drawAlien)}
 function updateAlienBullets(){
   alienBullets.forEach(b=>b.y+=5);
   alienBullets=alienBullets.filter(b=>b.y<620);
-  alienBullets.forEach(b=>{
-    if(b.x>player.x&&b.x<player.x+player.w&&b.y>player.y){
-      gameOver();
+  if(invincible>0){invincible--;return}
+  alienBullets.forEach((b,bi)=>{
+    if(b.x>player.x&&b.x<player.x+player.w&&b.y>player.y&&b.y<player.y+player.h){
+      alienBullets.splice(bi,1);
+      playerHit();
     }
   });
+}
+
+/* Player hit: lose a life, respawn with brief invincibility, or game over if out of lives */
+function playerHit(){
+  lives--;
+  updateUI();
+  if(lives<=0){
+    gameOver();
+    return;
+  }
+  respawnPlayer();
+}
+function respawnPlayer(){
+  player.x=380;
+  player.y=520;
+  alienBullets=alienBullets.filter(b=>Math.abs(b.x-player.x)>80);
+  invincible=90; // ~1.5s of invincibility/flashing at 60fps
 }
 function drawAlienBullets(){
   ctx.fillStyle="red";
