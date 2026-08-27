@@ -106,21 +106,42 @@ function drawBullets(){
   bullets.forEach(b=>ctx.fillRect(b.x,b.y,4,8));
 }
 
-/* Neon Alien */
+/* Neon Alien — classic pixel-art invader sprites, 2 animation frames */
+const ALIEN_SPRITE_A=[
+  "00100000100",
+  "00010001000",
+  "00111111100",
+  "01101110110",
+  "11111111111",
+  "10111111101",
+  "10100000101",
+  "00011011000"
+];
+const ALIEN_SPRITE_B=[
+  "00100000100",
+  "10010001001",
+  "10111111101",
+  "11101110111",
+  "11111111111",
+  "00111111100",
+  "01000000010",
+  "10100000101"
+];
 function drawAlien(e){
-  ctx.strokeStyle=e.color;
-  ctx.lineWidth=2;
+  const sprite=e.frame?ALIEN_SPRITE_B:ALIEN_SPRITE_A;
+  const cols=sprite[0].length, rows=sprite.length;
+  const px=e.w/cols, py=e.h/rows;
+  ctx.fillStyle=e.color;
   ctx.shadowBlur=10;
   ctx.shadowColor=e.color;
-  ctx.strokeRect(e.x,e.y,e.w,e.h);
-  ctx.shadowBlur=0;
-  if(e.frame){
-    ctx.beginPath();
-    ctx.moveTo(e.x,e.y+e.h);
-    ctx.lineTo(e.x+e.w/2,e.y+e.h-6);
-    ctx.lineTo(e.x+e.w,e.y+e.h);
-    ctx.stroke();
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      if(sprite[r][c]==="1"){
+        ctx.fillRect(e.x+c*px, e.y+r*py, Math.ceil(px), Math.ceil(py));
+      }
+    }
   }
+  ctx.shadowBlur=0;
 }
 
 /* Aliens */
