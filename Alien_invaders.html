@@ -241,6 +241,7 @@ function updateBoss(){
     boss.cool=40;
   }
   bullets.forEach((b,bi)=>{
+    if(!boss)return; // boss may have just been destroyed by an earlier bullet this frame
     if(b.x>boss.x&&b.x<boss.x+boss.w&&b.y>boss.y){
       bullets.splice(bi,1);
       boss.hp-=10;
